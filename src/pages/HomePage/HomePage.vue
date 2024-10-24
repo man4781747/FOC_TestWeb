@@ -467,38 +467,56 @@ export default {
       if (angIN < 60.) {
         var time_100 = UVM[0]
         var time_110 = UVM[1]
+        var time_000_111 = 100-UVM[0]-UVM[1]
         U_current = time_100*1/100+time_110*0.5/100
         V_current = time_100*-0.5/100+time_110*0.5/100
+        // U_current = (time_100-time_000_111/2)*1/100+(time_110-time_000_111/2)*0.5/100
+        // V_current = (time_100-time_000_111/2)*-0.5/100+(time_110-time_000_111/2)*0.5/100
       }
       else if (angIN >= 60. & angIN < 120) {
         var time_110 = UVM[0]
         var time_010 = UVM[1]
+        var time_000_111 = 100-UVM[0]-UVM[1]
         U_current = time_110*0.5/100+time_010*-0.5/100
         V_current = time_110*0.5/100+time_010*1/100
+        // U_current = (time_110-time_000_111/2)*0.5/100+(time_010-time_000_111/2)*-0.5/100
+        // V_current = (time_110-time_000_111/2)*0.5/100+(time_010-time_000_111/2)*1/100
       }
       else if (angIN >= 120. & angIN < 180) {
         var time_010 = UVM[0]
         var time_011 = UVM[1]
+        var time_000_111 = 100-UVM[0]-UVM[1]
         U_current = time_010*-0.5/100+time_011*-1/100
         V_current = time_010*1/100+time_011*0.5/100
+        // U_current = (time_010-time_000_111/2)*-0.5/100+(time_011-time_000_111/2)*-1/100
+        // V_current = (time_010-time_000_111/2)*1/100+(time_011-time_000_111/2)*0.5/100
       }
       else if (angIN >= 180. & angIN < 240) {
         var time_011 = UVM[0]
         var time_001 = UVM[1]
+        var time_000_111 = 100-UVM[0]-UVM[1]
         U_current = time_011*-1/100+time_001*-0.5/100
         V_current = time_011*0.5/100+time_001*-0.5/100
+        // U_current = (time_011-time_000_111/2)*-1/100+(time_001-time_000_111/2)*-0.5/100
+        // V_current = (time_011-time_000_111/2)*0.5/100+(time_001-time_000_111/2)*-0.5/100
       }
       else if (angIN >= 240. & angIN < 300) {
         var time_001 = UVM[0]
         var time_101 = UVM[1]
+        var time_000_111 = 100-UVM[0]-UVM[1]
         U_current = time_001*-0.5/100+time_101*0.5/100
         V_current = time_001*-0.5/100+time_101*-1/100
+        // U_current = (time_001-time_000_111/2)*-0.5/100+(time_101-time_000_111/2)*0.5/100
+        // V_current = (time_001-time_000_111/2)*-0.5/100+(time_101-time_000_111/2)*-1/100
       }
       else if (angIN >= 300. & angIN < 360) {
         var time_101 =  UVM[0]
         var time_100 = UVM[1]
+        var time_000_111 = 100-UVM[0]-UVM[1]
         U_current = time_101*0.5/100+time_100*1/100
         V_current = time_101*-1/100+time_100*-0.5/100
+        // U_current = (time_101-time_000_111/2)*0.5/100+(time_100-time_000_111/2)*1/100
+        // V_current = (time_101-time_000_111/2)*-1/100+(time_100-time_000_111/2)*-0.5/100
       }
       W_current = -(U_current+V_current)
       return [U_current, V_current, W_current]
@@ -508,32 +526,42 @@ export default {
       if (angIN < 60.) {
         var time_100 = UVM[0]
         var time_110 = UVM[1]
-        return [100, 100.-time_100, 100-(time_100+time_110)]
+        var time_111 = 100-UVM[0]-UVM[1]
+        // return [100, 100.-time_100, 100-(time_100+time_110)]
+        return [time_100+time_110+time_111/2, time_110+time_111/2, time_111/2]
       }
       else if (angIN >= 60. & angIN < 120) {
         var time_110 = UVM[0]
         var time_010 = UVM[1]
-        return [time_110, time_110+time_010, 0]
+        var time_000 = 100-UVM[0]-UVM[1]
+        // return [time_110, time_110+time_010, 0]
+        return [time_110+time_000/2, time_110+time_010+time_000/2, time_000/2]
       }
       else if (angIN >= 120. & angIN < 180) {
         var time_010 = UVM[0]
         var time_011 = UVM[1]
-        return [100-(time_010+time_011), 100, 100-time_010]
+        var time_111 = 100-UVM[0]-UVM[1]
+        // return [100-(time_010+time_011), 100, 100-time_010]
+        return [time_111/2, time_010+time_011+time_111/2, time_011+time_111/2]
       }
       else if (angIN >= 180. & angIN < 240) {
         var time_011 = UVM[0]
         var time_001 = UVM[1]
-        return [0, time_011, time_001+time_011]
+        var time_000 = 100-UVM[0]-UVM[1]
+        // return [0, time_011, time_001+time_011]
+        return [time_000/2, time_011+time_000/2, time_011+time_001+time_000/2]
       }
       else if (angIN >= 240. & angIN < 300) {
         var time_001 = UVM[0]
         var time_101 = UVM[1]
-        return [100-time_001, 100-(time_101+time_001), 100]
+        var time_111 = 100-UVM[0]-UVM[1]
+        return [time_101+time_111/2, time_111/2, time_001+time_101+time_111/2]
       }
       else if (angIN >= 300. & angIN < 360) {
         var time_101 = UVM[0]
         var time_100 = UVM[1]
-        return [time_100+time_101, 0, time_101]
+        var time_000 = 100-UVM[0]-UVM[1]
+        return [time_101+time_100+time_000/2, time_000/2, time_101+time_000/2]
       }
       return []
     },
