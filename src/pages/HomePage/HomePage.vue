@@ -113,7 +113,7 @@ export default {
     R_Park(){
       // 理想上 旋轉時 Id 越小越好 最好為0
       var Id = 0
-      var Iq = 1;
+      var Iq = 500;
       // var Id = this.Park[0]
       // var Iq = this.Park[1]
 
@@ -796,7 +796,7 @@ export default {
         .attr("height", height)
         .attr("viewBox", [0, 0, width, height])
         .attr("style", "max-width: 100%; height: auto;");
-      const y = d3.scaleLinear([-1, 1], [height-30, 30]);
+      const y = d3.scaleLinear([0, 100], [height-30, 30]);
       const x = d3.scaleLinear([0, 360], [40, width-40]);
       const line = d3.line()
         .x(d => x(d.ang))
@@ -823,7 +823,7 @@ export default {
       var L_W_current = []
       var L_U_current = []
       for (var angIndex in L_xList) {
-        var ReparkResult = this.calc_R_ParkFunction(-1,1,L_xList[angIndex])
+        var ReparkResult = this.calc_R_ParkFunction(1,-5.4,L_xList[angIndex])
         var ansList = this.calc_R_ClarkFunction(ReparkResult[0],ReparkResult[1])
         L_U_current.push({"ang":L_xList[angIndex], "value": ansList[0]})
         L_V_current.push({"ang":L_xList[angIndex], "value": ansList[1]})
@@ -1041,40 +1041,94 @@ export default {
     calc_R_ClarkFunction(U_alpha, U_Beta){
       // https://jianwei.fun/?p=2113
 
-      var Va, Vb, Vc;
-      Va = U_alpha/3*2;
-      Vb = (-0.5*U_alpha+0.86602540378*U_Beta)/3*2
-      Vc = (-0.5*U_alpha-0.86602540378*U_Beta)/3*2
-
-
-      var U_a = U_alpha*Math.sqrt(3)
-      var U_b = -U_Beta
-      var X, Y, Z, Part
-      var phA, phB, phC
-      X = U_b
-      Y = (U_b + U_a) / 2
-      Z = (U_b - U_a) / 2
-      
-      if (Y<0) {
-        if (Z<0){Part = 5;}
-        else {
-          if (X<=0) {Part = 4;}
-          else {Part = 3;}
-        }
+      var U1, U2, U3;
+      U1 = U_Beta;
+      // Vb = -0.5*U_alpha+0.86602540378*U_Beta
+      // Vc = -0.5*U_alpha-0.86602540378*U_Beta
+      U2 = -0.5*U_Beta+0.86602540378*U_alpha
+      U3 = -0.5*U_Beta-0.86602540378*U_alpha
+      var A = 0, B = 0, C = 0;
+      if (U1 > 0) A = 1;
+      if (U2 > 0) B = 1;
+      if (U3 > 0) C = 1;
+      var N = 4*C + 2*B + A;
+      var Sector;
+      switch (N) {
+        case 3: Sector = 1; break;
+        case 1: Sector = 2; break;
+        case 5: Sector = 3; break;
+        case 4: Sector = 4; break;
+        case 6: Sector = 5; break;
+        case 2: Sector = 6; break;
       }
-      else {
-        if (Z>=0){Part = 2;}
-        else if (X<=0){Part = 6;}
-        else {Part = 1;}
-      }             
-
-      if (Part === 1 | Part === 4) {
+      var T1, T2, T3, T4, T5, T6, T7, Ts=1
+      switch (Sector) {
+        case 1:
+          T4 = 1.73205080757 * Ts / 10. * U2;
+          T6 = 1.73205080757 * Ts / 10. * U1;
+          T7 = (Ts - T4 - T6) / 2;
+          break;
+        case 2:
+          T2 = -1.73205080757 * Ts / 10. * U2;
+          T6 = -1.73205080757 * Ts / 10. * U3;
+          T7 = (Ts - T2 - T6) / 2;
+          break;
+        case 3:
+          T2 = 1.73205080757 * Ts / 10. * U1;
+          T3 = 1.73205080757 * Ts / 10. * U3;
+          T7 = (Ts - T2 - T3) / 2;
+          break;
+        case 4:
+          T1 = -1.73205080757 * Ts / 10. * U1;
+          T3 = -1.73205080757 * Ts / 10. * U2;
+          T7 = (Ts - T1 - T3) / 2;
+          break;
+        case 5:
+          T1 = 1.73205080757 * Ts / 10. * U3;
+          T5 = 1.73205080757 * Ts / 10. * U2;
+          T7 = (Ts - T1 - T5) / 2;
+          break;
+        case 6:
+          T4 = -1.73205080757 * Ts / 10. * U3;
+          T5 = -1.73205080757 * Ts / 10. * U1;
+          T7 = (Ts - T4 - T5) / 2;
+          break;
+      }
+      var Ta, Tb, Tc
+      switch (Sector) {
+      case 1:
+        Ta = T4 + T6 + T7;
+        Tb = T6 + T7;
+        Tc = T7;
+        break;
+      case 2:
+        Ta = T6 + T7;
+        Tb = T2 + T6 + T7;
+        Tc = T7;
+        break;
+      case 3:
+        Ta = T7;
+        Tb = T2 + T3 + T7;
+        Tc = T3 + T7;
+        break;
+      case 4:
+        Ta = T7;
+        Tb = T3 + T7;
+        Tc = T1 + T3 + T7;
+        break;
+      case 5:
+        Ta = T5 + T7;
+        Tb = T7;
+        Tc = T1 + T5 + T7;
+        break;
+      case 6:
+        Ta = T4 + T5 + T7;
+        Tb = T7;
+        Tc = T5 + T7;
+        break;
       }
 
-
-
-
-      return [Va, Vb, Vc, Part, N]
+      return [Ta*100, Tb*100, Tc*100]
     },
   },
   mounted(){
