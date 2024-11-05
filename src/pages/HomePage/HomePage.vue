@@ -1,16 +1,36 @@
 <template>
-  <div class="row">
-    <div class="col-8">
-      <div id="pwm-time-plot"></div>
-    </div>
-    <div class="col-4">
-      <div id="six-area-plot"></div>
-    </div>
-    <div class="col-6">
-      <div id="pwm-loop-plot"></div>
-    </div>
-    <div class="col-6">
-      <div id="current-loop-plot"></div>
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-2">
+        <div id="pwm-time-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="pwm-loop-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="current-loop-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="clark-loop-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="park-loop-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="six-area-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="-repwm-time-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="re-pwm-loop-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="re-clark-loop-plot"></div>
+      </div>
+      <div class="col-2">
+        <div id="re-park-loop-plot"></div>
+      </div>
     </div>
   </div>
   <!-- <div class="">{{ CalcCurrent }}</div>。 -->
@@ -22,16 +42,23 @@
 export default {
   data () {
   return {
-    SixAreaHeight: 300,
-    SixAreaWidth: 300,
+    SixAreaHeight: window.innerWidth/5,
+    SixAreaWidth: window.innerWidth/5,
 
-    PwmTimerHeight: 300,
+    PwmTimerHeight: window.innerWidth/5,
     PwnTimer_LowStatusOffest: 5,
     PwnTimer_HighStatusOffest: 10,
-    PwmTimerWidth: window.innerWidth-500,
+    // PwmTimerWidth: window.innerWidth-500,
+    PwmTimerWidth: window.innerWidth/5,
     PwnTimer_XLeft: 50,
     PwnTimer_TitleFontSize : 24,
+    
+    PwmLoop_Width: window.innerWidth/5,
 
+    CurrentLoop_Width: window.innerWidth/5,
+    ParkLoop_Width: window.innerWidth/5,
+    ClarkLoop_Width: window.innerWidth/5,
+    
     nowAng: 90,
     power: 100,
   }
@@ -46,6 +73,61 @@ export default {
     CalcCurrent(){
       return this.calcCurrentFunction(this.nowAng)
     },
+    Clark(){
+      var Current = this.CalcCurrent
+      // [I_alpha, I_beta]
+      return [
+        Current[0] - 0.5*Current[1] - 0.5*Current[2],
+        0.86602540378*Current[1] - 0.86602540378*Current[2]
+      ]
+    },
+
+    testParkToPart(){
+      var A, B, C, N, Part
+      var U_alpha = this.Clark[0]
+      var U_Beta = this.Clark[1]
+      A = U_Beta > 0 ? 1 : 0
+      B = -U_alpha*Math.sqrt(3) - U_Beta > 0 ? 1 : 0
+      C =  U_alpha*Math.sqrt(3) - U_Beta > 0 ? 1 : 0
+      // console.log(A, B, C)
+      N = 4*C + 2*B + A
+      if (N === 5) {Part=1}
+      else if (N === 1) {Part=2}
+      else if (N === 3) {Part=3}
+      else if (N === 2) {Part=4}
+      else if (N === 6) {Part=5}
+      else if (N === 4) {Part=6}
+      return [N, Part]
+    },
+
+    Park() {
+      var clark_result = this.Clark
+      // [I_d, I_q]
+      // I_d 越大，花越多力氣在維持當前狀態，是浪費的
+      // I_d 越大，代表花越多力氣在旋轉，效率越高
+      return [
+        clark_result[0] * Math.cos(this.nowAng*Math.PI/180.0) + clark_result[1] * Math.sin(this.nowAng*Math.PI/180.0),
+        clark_result[0] * -Math.sin(this.nowAng*Math.PI/180.0) + clark_result[1] * Math.cos(this.nowAng*Math.PI/180.0),
+      ]
+    },
+    R_Park(){
+      // 理想上 旋轉時 Id 越小越好 最好為0
+      var Id = 0
+      var Iq = 1;
+      // var Id = this.Park[0]
+      // var Iq = this.Park[1]
+
+      return [
+        Id * Math.cos(this.nowAng*Math.PI/180.0) - Iq * Math.sin(this.nowAng*Math.PI/180.0),
+        Id * Math.sin(this.nowAng*Math.PI/180.0) + Iq * Math.cos(this.nowAng*Math.PI/180.0),
+      ]
+    },
+
+    R_Clark () {
+      return this.calc_R_ClarkFunction(this.R_Park[0], this.R_Park[1])
+    },
+
+
   },
   methods:{
     AngChange(){
@@ -54,11 +136,14 @@ export default {
       this.plotPwmLoopAng()
       this.plotSixAreaForceWay()
       this.plotCurrentLoopAng()
+      this.plotClarkLoopAng()
+      this.plotParkLoopAng()
+      this.plotReParkLoopAng()
     },
     PowerChange(){
       this.plotPwmTimePaths()
       this.plotSixAreaForceWay()
-      this.rePlotPwmTimingCycle()
+      this.replotPwmLoopCycle()
       this.rePlotCurrentCycle()
     },
 
@@ -91,8 +176,8 @@ export default {
       svg.append("text").attr("x", xLeft - TitleFontSize).attr("y", height/6*3+TitleFontSize/2).attr("text-anchor", "middle").attr("font-size", TitleFontSize+"px").attr("fill", "black").text("V");
       svg.append("text").attr("x", xLeft - TitleFontSize).attr("y", height/6*5+TitleFontSize/2).attr("text-anchor", "middle").attr("font-size", TitleFontSize+"px").attr("fill", "black").text("W");
       
-      svg.append("path").attr("id", "u-pwm-time-path").attr("fill", "none").attr("stroke", "red").attr("stroke-width", "2")
-      svg.append("path").attr("id", "v-pwm-time-path").attr("fill", "none").attr("stroke", "red").attr("stroke-width", "2")
+      svg.append("path").attr("id", "u-pwm-time-path").attr("fill", "none").attr("stroke", "steelblue").attr("stroke-width", "2")
+      svg.append("path").attr("id", "v-pwm-time-path").attr("fill", "none").attr("stroke", "green").attr("stroke-width", "2")
       svg.append("path").attr("id", "w-pwm-time-path").attr("fill", "none").attr("stroke", "red").attr("stroke-width", "2")
     },
     plotPwmTimePaths(){
@@ -244,9 +329,9 @@ export default {
     },
 
     //? PWM 時序週期圖
-    plotPwmTimingCycle() {
+    plotPwmLoopCycle() {
       const height = this.SixAreaHeight
-      const width = (this.SixAreaWidth+this.PwmTimerWidth)/2
+      const width = this.PwmLoop_Width
       const svg = d3.select('#pwm-loop-plot').append('svg')
         .attr("id","pwm-loop-plot-svg")
         .attr("width", width)
@@ -318,14 +403,14 @@ export default {
     },
     plotPwmLoopAng(){
       var pathItem = document.getElementById("pwm-loop-plot-svg-ang")
-      const width = (this.SixAreaWidth+this.PwmTimerWidth)/2
+      const width = this.PwmLoop_Width
       const x = d3.scaleLinear([0, 360], [40, width-40]);
       pathItem.setAttribute("x1", x(this.nowAng)) 
       pathItem.setAttribute("x2", x(this.nowAng)) 
     },
-    rePlotPwmTimingCycle(){
+    replotPwmLoopCycle(){
       const height = this.SixAreaHeight
-      const width = (this.SixAreaWidth+this.PwmTimerWidth)/2
+      const width = this.PwmLoop_Width
       var L_xList = [...Array(360).keys()]
       var L_U_pwmTime = []
       var L_V_pwmTime = []
@@ -350,9 +435,9 @@ export default {
     },
 
     //? 電流時序圖
-    plotCurrentTimingCycle() {
+    plotCurrentLoopCycle() {
       const height = this.SixAreaHeight
-      const width = (this.SixAreaWidth+this.PwmTimerWidth)/2
+      const width = this.CurrentLoop_Width
       const svg = d3.select('#current-loop-plot').append('svg')
         .attr("id","current-loop-plot-svg")
         .attr("width", width)
@@ -422,14 +507,14 @@ export default {
     },
     plotCurrentLoopAng(){
       var pathItem = document.getElementById("current-loop-plot-svg-ang")
-      const width = (this.SixAreaWidth+this.PwmTimerWidth)/2
+      const width = this.CurrentLoop_Width
       const x = d3.scaleLinear([0, 360], [40, width-40]);
       pathItem.setAttribute("x1", x(this.nowAng)) 
       pathItem.setAttribute("x2", x(this.nowAng)) 
     },
     rePlotCurrentCycle(){
       const height = this.SixAreaHeight
-      const width = (this.SixAreaWidth+this.PwmTimerWidth)/2
+      const width = this.CurrentLoop_Width
       const y = d3.scaleLinear([-1, 1], [height-30, 30]);
       const x = d3.scaleLinear([0, 360], [40, width-40]);
       const line = d3.line()
@@ -454,6 +539,326 @@ export default {
       var pathItem = document.getElementById("current-loop-plot-svg-w")
       pathItem.setAttribute("d", line(L_W_current)) 
     },
+
+    //? Clark 轉換後時序圖
+    plotClarkLoopCycle() {
+      const height = this.SixAreaHeight
+      const width = this.ParkLoop_Width
+      const svg = d3.select('#clark-loop-plot').append('svg')
+        .attr("id","clark-loop-plot-svg")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("viewBox", [0, 0, width, height])
+        .attr("style", "max-width: 100%; height: auto;");
+
+      var L_xList = [...Array(360).keys()]
+      var L_I_alpha = []
+      var L_I_bera = []
+      
+      var maxY = 0
+      var minY = 0
+
+      for (var angIndex in L_xList) {
+        var currentList = this.calcCurrentFunction(L_xList[angIndex])
+        var ansList = this.calcClarkFunction(currentList[0],currentList[1],currentList[2])
+        L_I_alpha.push({"ang":L_xList[angIndex], "value": ansList[0]})
+        L_I_bera.push({"ang":L_xList[angIndex], "value": ansList[1]})
+        maxY = Math.max(maxY, ansList[0], ansList[1])
+        minY = Math.min(minY, ansList[0], ansList[1])
+      }
+      const y = d3.scaleLinear([minY*1.1, maxY*1.1], [height-30, 30]);
+      const x = d3.scaleLinear([0, 360], [40, width-40]);
+      const line = d3.line()
+        .x(d => x(d.ang))
+        .y(d => y(d.value));
+
+      svg.append("g")
+        .attr("transform", `translate(0,${height - 30})`)
+        .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+
+      svg.append("g")
+        .attr("transform", `translate(${40},0)`)
+        .call(d3.axisLeft(y).ticks(height / 40))
+        .call(g => g.select(".domain").remove())
+        .call(g => g.selectAll(".tick line").clone()
+            .attr("x2", width - 40 - 40)
+            .attr("stroke-opacity", 0.1))
+        .call(g => g.append("text")
+            .attr("x", -20)
+            .attr("y", 10)
+            .attr("fill", "currentColor")
+            .attr("text-anchor", "start")
+            .text("A"));
+
+      svg.append("path")
+        .attr("id", "current-loop-plot-svg-i-alpha")
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_I_alpha));
+      svg.append("path")
+        .attr("id", "current-loop-plot-svg-i-beta")
+        .attr("fill", "none")
+        .attr("stroke", "green")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_I_bera));
+
+      svg.append("line")
+        .attr("id", "clark-loop-plot-svg-ang")
+        .attr("x1", x(this.nowAng)) 
+        .attr("y1", y(minY))
+        .attr("x2", x(this.nowAng))
+        .attr("y2", y(maxY))
+        .attr("stroke-dasharray", "2,2")
+        .attr("stroke", "black")
+        .attr("stroke-width", 1);
+    },
+    plotClarkLoopAng(){
+      var pathItem = document.getElementById("clark-loop-plot-svg-ang")
+      const width = this.ParkLoop_Width
+      const x = d3.scaleLinear([0, 360], [40, width-40]);
+      pathItem.setAttribute("x1", x(this.nowAng)) 
+      pathItem.setAttribute("x2", x(this.nowAng)) 
+    },
+
+    //? Park 轉換後時序圖
+    plotParkLoopCycle() {
+      const height = this.SixAreaHeight
+      const width = this.ParkLoop_Width
+      const svg = d3.select('#park-loop-plot').append('svg')
+        .attr("id","park-loop-plot-svg")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("viewBox", [0, 0, width, height])
+        .attr("style", "max-width: 100%; height: auto;");
+
+      var L_xList = [...Array(360).keys()]
+      var L_I_d = []
+      var L_I_q = []
+      
+      var maxY = 0
+      var minY = 0
+
+      for (var angIndex in L_xList) {
+        var currentList = this.calcCurrentFunction(L_xList[angIndex])
+        var clarkList = this.calcClarkFunction(currentList[0],currentList[1],currentList[2])
+        var ansList = this.calcParkFunction(clarkList[0],clarkList[1],L_xList[angIndex])
+        L_I_d.push({"ang":L_xList[angIndex], "value": ansList[0]})
+        L_I_q.push({"ang":L_xList[angIndex], "value": ansList[1]})
+        maxY = Math.max(maxY, ansList[0], ansList[1])
+        minY = Math.min(minY, ansList[0], ansList[1])
+      }
+      const y = d3.scaleLinear([minY*1.1, maxY*1.1], [height-30, 30]);
+      const x = d3.scaleLinear([0, 360], [40, width-40]);
+      const line = d3.line()
+        .x(d => x(d.ang))
+        .y(d => y(d.value));
+
+      svg.append("g")
+        .attr("transform", `translate(0,${height - 30})`)
+        .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+
+      svg.append("g")
+        .attr("transform", `translate(${40},0)`)
+        .call(d3.axisLeft(y).ticks(height / 40))
+        .call(g => g.select(".domain").remove())
+        .call(g => g.selectAll(".tick line").clone()
+            .attr("x2", width - 40 - 40)
+            .attr("stroke-opacity", 0.1))
+        .call(g => g.append("text")
+            .attr("x", -20)
+            .attr("y", 10)
+            .attr("fill", "currentColor")
+            .attr("text-anchor", "start")
+            .text("A"));
+
+      svg.append("path")
+        .attr("id", "park-loop-plot-svg-i-d")
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_I_d))
+      svg.append("text").attr("x", x(360)).attr("y", y(maxY*1.05)).attr("text-anchor", "middle").attr("font-size", "18px").attr("fill", "steelblue").text("I_d");
+
+      svg.append("path")
+        .attr("id", "park-loop-plot-svg-i-q")
+        .attr("fill", "none")
+        .attr("stroke", "green")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_I_q));
+      svg.append("text").attr("x", x(360)).attr("y", y(minY*0.95)).attr("text-anchor", "middle").attr("font-size", "18px").attr("fill", "green").text("I_q");
+
+      svg.append("line")
+        .attr("id", "park-loop-plot-svg-ang")
+        .attr("x1", x(this.nowAng)) 
+        .attr("y1", y(minY))
+        .attr("x2", x(this.nowAng))
+        .attr("y2", y(maxY))
+        .attr("stroke-dasharray", "2,2")
+        .attr("stroke", "black")
+        .attr("stroke-width", 1);
+    },
+    plotParkLoopAng(){
+      var pathItem = document.getElementById("park-loop-plot-svg-ang")
+      const width = this.ParkLoop_Width
+      const x = d3.scaleLinear([0, 360], [40, width-40]);
+      pathItem.setAttribute("x1", x(this.nowAng)) 
+      pathItem.setAttribute("x2", x(this.nowAng)) 
+    },
+
+    //? 反 Park 轉換後時序圖
+    plotReParkLoopCycle() {
+      const height = this.SixAreaHeight
+      const width = this.ParkLoop_Width
+      const svg = d3.select('#re-park-loop-plot').append('svg')
+        .attr("id","re-park-loop-plot-svg")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("viewBox", [0, 0, width, height])
+        .attr("style", "max-width: 100%; height: auto;");
+
+      var L_xList = [...Array(360).keys()]
+      var L_rPark_alpha = []
+      var L_rPark_beta = []
+      var maxY = 0
+      var minY = 0
+
+      for (var angIndex in L_xList) {
+        var reParkList = this.calc_R_ParkFunction(-1,1,L_xList[angIndex])
+        L_rPark_alpha.push({"ang":L_xList[angIndex], "value": reParkList[0]})
+        L_rPark_beta.push({"ang":L_xList[angIndex], "value": reParkList[1]})
+        maxY = Math.max(maxY, reParkList[0], reParkList[1])
+        minY = Math.min(minY, reParkList[0], reParkList[1])
+      }
+      const y = d3.scaleLinear([minY*1.1, maxY*1.1], [height-30, 30]);
+      const x = d3.scaleLinear([0, 360], [40, width-40]);
+      const line = d3.line()
+        .x(d => x(d.ang))
+        .y(d => y(d.value));
+
+      svg.append("g")
+        .attr("transform", `translate(0,${height - 30})`)
+        .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+
+      svg.append("g")
+        .attr("transform", `translate(${40},0)`)
+        .call(d3.axisLeft(y).ticks(height / 40))
+        .call(g => g.select(".domain").remove())
+        .call(g => g.selectAll(".tick line").clone()
+            .attr("x2", width - 40 - 40)
+            .attr("stroke-opacity", 0.1))
+        .call(g => g.append("text")
+            .attr("x", -20)
+            .attr("y", 10)
+            .attr("fill", "currentColor")
+            .attr("text-anchor", "start")
+            .text("A"));
+
+      svg.append("path")
+        .attr("id", "re-park-loop-plot-svg-i-beta")
+        .attr("fill", "none")
+        .attr("stroke", "red")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_rPark_beta));
+
+      svg.append("path")
+        .attr("id", "re-park-loop-plot-svg-i-alpha")
+        .attr("fill", "none")
+        .attr("stroke", "black")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_rPark_alpha));
+
+      svg.append("line")
+        .attr("id", "re-park-loop-plot-svg-ang")
+        .attr("x1", x(this.nowAng)) 
+        .attr("y1", y(minY))
+        .attr("x2", x(this.nowAng))
+        .attr("y2", y(maxY))
+        .attr("stroke-dasharray", "2,2")
+        .attr("stroke", "black")
+        .attr("stroke-width", 1);
+    },
+    plotReParkLoopAng(){
+      var pathItem = document.getElementById("re-park-loop-plot-svg-ang")
+      const width = this.ParkLoop_Width
+      const x = d3.scaleLinear([0, 360], [40, width-40]);
+      pathItem.setAttribute("x1", x(this.nowAng)) 
+      pathItem.setAttribute("x2", x(this.nowAng)) 
+    },
+
+    //? 反 Clark 轉換後時序圖
+    plotReClarkLoopCycle() {
+      const height = this.SixAreaHeight
+      const width = this.CurrentLoop_Width
+      const svg = d3.select('#re-clark-loop-plot').append('svg')
+        .attr("id","re-clark-loop-plot-svg")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("viewBox", [0, 0, width, height])
+        .attr("style", "max-width: 100%; height: auto;");
+      const y = d3.scaleLinear([-1, 1], [height-30, 30]);
+      const x = d3.scaleLinear([0, 360], [40, width-40]);
+      const line = d3.line()
+        .x(d => x(d.ang))
+        .y(d => y(d.value));
+      svg.append("g")
+        .attr("transform", `translate(0,${height - 30})`)
+        .call(d3.axisBottom(x).ticks(width / 80).tickSizeOuter(0));
+      svg.append("g")
+        .attr("transform", `translate(${40},0)`)
+        .call(d3.axisLeft(y).ticks(height / 40))
+        .call(g => g.select(".domain").remove())
+        .call(g => g.selectAll(".tick line").clone()
+            .attr("x2", width - 40 - 40)
+            .attr("stroke-opacity", 0.1))
+        .call(g => g.append("text")
+            .attr("x", -20)
+            .attr("y", 10)
+            .attr("fill", "currentColor")
+            .attr("text-anchor", "start")
+            .text("A"));
+            var L_U_pwmTime = []
+      var L_xList = [...Array(360).keys()]
+      var L_V_current = []
+      var L_W_current = []
+      var L_U_current = []
+      for (var angIndex in L_xList) {
+        var ReparkResult = this.calc_R_ParkFunction(-1,1,L_xList[angIndex])
+        var ansList = this.calc_R_ClarkFunction(ReparkResult[0],ReparkResult[1])
+        L_U_current.push({"ang":L_xList[angIndex], "value": ansList[0]})
+        L_V_current.push({"ang":L_xList[angIndex], "value": ansList[1]})
+        L_W_current.push({"ang":L_xList[angIndex], "value": ansList[2]})
+      }
+      svg.append("path")
+        .attr("id", "re-clark-loop-plot-svg-u")
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_U_current));
+      svg.append("path")
+        .attr("id", "re-clark-loop-plot-svg-v")
+        .attr("fill", "none")
+        .attr("stroke", "green")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_V_current));
+      svg.append("path")
+        .attr("id", "re-clark-loop-plot-svg-w")
+        .attr("fill", "none")
+        .attr("stroke", "red")
+        .attr("stroke-width", 1)
+        .attr("d", line(L_W_current));
+
+      svg.append("line")
+        .attr("id", "re-clark-loop-plot-svg-ang")
+        .attr("x1", x(this.nowAng)) 
+        .attr("y1", y(-1))
+        .attr("x2", x(this.nowAng))
+        .attr("y2", y(1))
+        .attr("stroke-dasharray", "2,2")
+        .attr("stroke", "black")
+        .attr("stroke-width", 1);
+    },
+
 
     calcUVMTimeFunction(angIN){
       return [
@@ -613,16 +1018,77 @@ export default {
       return [0,0]
     },
 
+    calcClarkFunction(Ia, Ib, Ic){
+      // [I_alpha, I_beta]
+      return [
+        Ia - Ib*0.5 - Ic*0.5,
+        Ib*0.86602540378 - Ic*0.86602540378
+      ]
+    },
+    calcParkFunction(I_alpha, I_beta, ang){
+      // [I_d, I_q]
+      return [
+        I_alpha * Math.cos(ang*Math.PI/180.0) + I_beta * Math.sin(ang*Math.PI/180.0),
+        I_alpha * -Math.sin(ang*Math.PI/180.0) + I_beta * Math.cos(ang*Math.PI/180.0),
+      ]
+    },
+    calc_R_ParkFunction(Id, Iq, angIN){
+      return [
+        Id * Math.cos(angIN*Math.PI/180.0) - Iq * Math.sin(angIN*Math.PI/180.0),
+        Id * Math.sin(angIN*Math.PI/180.0) + Iq * Math.cos(angIN*Math.PI/180.0),
+      ]
+    },
+    calc_R_ClarkFunction(U_alpha, U_Beta){
+      // https://jianwei.fun/?p=2113
 
+      var Va, Vb, Vc;
+      Va = U_alpha/3*2;
+      Vb = (-0.5*U_alpha+0.86602540378*U_Beta)/3*2
+      Vc = (-0.5*U_alpha-0.86602540378*U_Beta)/3*2
+
+
+      var U_a = U_alpha*Math.sqrt(3)
+      var U_b = -U_Beta
+      var X, Y, Z, Part
+      var phA, phB, phC
+      X = U_b
+      Y = (U_b + U_a) / 2
+      Z = (U_b - U_a) / 2
+      
+      if (Y<0) {
+        if (Z<0){Part = 5;}
+        else {
+          if (X<=0) {Part = 4;}
+          else {Part = 3;}
+        }
+      }
+      else {
+        if (Z>=0){Part = 2;}
+        else if (X<=0){Part = 6;}
+        else {Part = 1;}
+      }             
+
+      if (Part === 1 | Part === 4) {
+      }
+
+
+
+
+      return [Va, Vb, Vc, Part, N]
+    },
   },
   mounted(){
     this.plotSixAreaBasePlot()
     this.plotSixAreaAngWay()
     this.poltPwmTimeBasePlot()
     this.plotPwmTimePaths()
-    this.plotPwmTimingCycle()
+    this.plotPwmLoopCycle()
     this.plotPwmLoopAng()
-    this.plotCurrentTimingCycle()
+    this.plotCurrentLoopCycle()
+    this.plotClarkLoopCycle()
+    this.plotParkLoopCycle()
+    this.plotReParkLoopCycle()
+    this.plotReClarkLoopCycle()
     window.test = this
   },
 }
